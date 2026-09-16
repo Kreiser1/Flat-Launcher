@@ -1,4 +1,4 @@
 <Solution>
   <Project Path="Flat-Client/Flat-Client.csproj" />
-  <Project Path="Flat-Server/Flat-Server.csproj" />
+  <Project Path="Flat-Server/Flat-Server.csproj" Id="d137fb43-6b97-4503-973b-5c80989d6faf" />
 </Solution>

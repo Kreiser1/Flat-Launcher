@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Flat-Client/Flat-Client.csproj" />
+  <Project Path="Flat-Server/Flat-Server.csproj" />
+</Solution>

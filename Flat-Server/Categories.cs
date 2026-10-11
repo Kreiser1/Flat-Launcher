@@ -10,20 +10,17 @@
 	{
 		public static Category Insert(string name)
 		{
-			using var connection = Database.Connection;
-
-			return connection.QueryFirst<Category>(@"
+			return Database.Connection.QueryFirst<Category>(@"
 				INSERT INTO categories (name) VALUES (@name)
+				RETURNING *
 			", new { name });
 		}
 
 		public static void Update(int id, string name)
 		{
-			using var connection = Database.Connection;
-
 			try
 			{
-				int rowsAffected = connection.Execute("UPDATE categories SET (name = @name) WHERE id = @id;",
+				int rowsAffected = Database.Connection.Execute("UPDATE categories SET name = @name WHERE id = @id;",
 				   new { id, name });
 
 				if (rowsAffected == 0)
@@ -41,26 +38,20 @@
 
 		public static Category? Select(int id)
 		{
-			using var connection = Database.Connection;
-
-			return connection.QueryFirstOrDefault<Category>(@"
+			return Database.Connection.QueryFirstOrDefault<Category>(@"
 				SELECT * FROM categories WHERE id = @id;
 				", new { id });
 		}
 
 		public static Category[] Select(string? name = null)
 		{
-			using var connection = Database.Connection;
-
-			return connection.Query<Category>($"SELECT * FROM categories WHERE {(name is not null ? $"name ILIKE @name" : "TRUE")};",
+			return Database.Connection.Query<Category>($"SELECT * FROM categories WHERE {(name is not null ? $"name ILIKE @name" : "TRUE")};",
 			new { name = $"%{name}%" }).ToArray();
 		}
 
 		public static void Delete(int id)
 		{
-			using var connection = Database.Connection;
-
-			int rowsAffected = connection.Execute(@"
+			int rowsAffected = Database.Connection.Execute(@"
 					DELETE FROM categories WHERE id = @id;
 					", new { id });
 

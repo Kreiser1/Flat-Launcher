@@ -14,13 +14,11 @@
 	{
 		public static Game Insert(int user_id, string name, byte[]? icon = null, string? description = null, int[]? categories = null, byte[][]? images = null)
 		{
-			using var connection = Database.Connection;
-
 			try
 			{
-				using var transaction = connection.BeginTransaction();
+				using var transaction = Database.Connection.BeginTransaction();
 
-				Game game = connection.QueryFirst(@"
+				Game game = Database.Connection.QueryFirst<Game>(@"
 					INSERT INTO games (user_id, name, icon, description)
 					VALUES(@user_id, @name, @icon, @description)
 					RETURNING *;
@@ -28,14 +26,14 @@
 
 				if (categories is not null)
 					foreach (int category_id in categories)
-						connection.Execute(@"
+						Database.Connection.Execute(@"
 						INSERT INTO games_categories (game_id, category_id)
 						VALUES (@game_id, @category_id);
 					", new { game_id = game.Id, category_id });
 
 				if (images is not null)
 					foreach (byte[] data in images)
-						connection.Execute(@"
+						Database.Connection.Execute(@"
 						INSERT INTO game_images (game_id, data)
 						VALUES (@game_id, @data);
 					", new { game_id = game.Id, data });
@@ -77,27 +75,32 @@
 			if (approved is not null)
 				clauses.Add("approved = @approved");
 
-			if (clauses.Count == 0)
-				return;
-
-			using var connection = Database.Connection;
-
 			try
 			{
-				using var transaction = connection.BeginTransaction();
+				using var transaction = Database.Connection.BeginTransaction();
 
-				int rowsAffected = connection.Execute($"UPDATE games SET {string.Join(", ", clauses)} WHERE id = @id;",
-				new { id, user_id, name, icon, description, approved });
+				if (clauses.Count > 0)
+				{
+					int rowsAffected = Database.Connection.Execute($"UPDATE games SET {string.Join(", ", clauses)} WHERE id = @id;",
+					new { id, user_id, name, icon, description, approved });
 
-				if (rowsAffected == 0)
-					throw new DatabaseException($"Игра с ID {id} не найдена.");
+					if (rowsAffected == 0)
+						throw new DatabaseException($"Игра с ID {id} не найдена.");
+				}
+				else
+				{
+					int? gameId = Database.Connection.Execute("SELECT id FROM games WHERE id = @id;", new { id });
+
+					if (gameId is null)
+						throw new DatabaseException($"Игра с ID {id} не найдена.");
+				}
 
 				if (categories is not null)
 				{
-					connection.Execute("DELETE FROM games_categories WHERE game_id = @id;", new { id });
+					Database.Connection.Execute("DELETE FROM games_categories WHERE game_id = @id;", new { id });
 
 					foreach (int category_id in categories)
-						connection.Execute(@"
+						Database.Connection.Execute(@"
 						INSERT INTO games_categories (game_id, category_id)
 						VALUES (@id, @category_id);
 					", new { id, category_id });
@@ -105,10 +108,10 @@
 
 				if (images is not null)
 				{
-					connection.Execute("DELETE FROM game_images WHERE game_id = @id;", new { id });
+					Database.Connection.Execute("DELETE FROM game_images WHERE game_id = @id;", new { id });
 
 					foreach (byte[] data in images)
-						connection.Execute(@"
+						Database.Connection.Execute(@"
 						INSERT INTO game_images (game_id, data)
 						VALUES (@id, @data);
 					", new { id, data });
@@ -128,51 +131,37 @@
 
 		public static Game? Select(int id)
 		{
-			using var connection = Database.Connection;
-
-			return connection.QueryFirstOrDefault<Game>(@"
+			return Database.Connection.QueryFirstOrDefault<Game>(@"
 				SELECT * FROM games WHERE id = @id;
 				", new { id });
 		}
 
-		public static Game[] Select(int offset, int count, string? name = null)
+		public static Game[] Select(int offset, int count, string? name = null, bool approved = true)
 		{
-			List<string> clauses = new();
-
-			if (name is not null)
-				clauses.Add("name ILIKE @name");
-
 			count = Math.Clamp(count, 0, 30);
 
 			if (offset < 0)
 				offset = 0;
 
-			using var connection = Database.Connection;
-
-			return connection.Query<Game>($"SELECT * FROM games WHERE {(name is not null ? "name ILIKE @name" : "TRUE")} LIMIT @count OFFSET @offset;",
-			new { name = $"%{name}%", offset, count }).ToArray();
+			return Database.Connection.Query<Game>($"SELECT * FROM games WHERE {(name is not null ? "name ILIKE @name" : "TRUE")} AND (approved AND @approved) LIMIT @count OFFSET @offset;",
+			new { name = $"%{name}%", offset, count, approved }).ToArray();
 		}
 
 		public static Category[] GetCategories(int id)
 		{
-			using var connection = Database.Connection;
-
-			return connection.Query<Category>($"SELECT * FROM categories JOIN games_categories on categories.id = games_categories.category_id WHERE games_categories.game_id = @id;",
+			return Database.Connection.Query<Category>($"SELECT categories.id, categories.name FROM categories JOIN games_categories on categories.id = games_categories.category_id WHERE games_categories.game_id = @id;",
 			new { id }).ToArray();
 		}
 
-		public static GameImage[] GetImages(int id) {
-			using var connection = Database.Connection;
-
-			return connection.Query<GameImage>($"SELECT * FROM game_images WHERE game_id = @id;",
+		public static GameImage[] GetImages(int id)
+		{
+			return Database.Connection.Query<GameImage>($"SELECT * FROM game_images WHERE game_id = @id;",
 			new { id }).ToArray();
 		}
 
 		public static void Delete(int id)
 		{
-			using var connection = Database.Connection;
-
-			int rowsAffected = connection.Execute(@"
+			int rowsAffected = Database.Connection.Execute(@"
 					DELETE FROM games WHERE id = @id;
 					", new { id });
 
@@ -182,17 +171,15 @@
 
 		public static GameComment InsertComment(int id, int user_id, string text)
 		{
-			using var connection = Database.Connection;
-
 			try
 			{
-				GameComment gameComment = connection.QueryFirst(@"
+				GameComment comment = Database.Connection.QueryFirst(@"
 					INSERT INTO game_comments (game_id, user_id, text)
 					VALUES (@id, @user_id, @text)
 					RETURNING *;
 				", new { id, user_id, text });
 
-				return gameComment;
+				return comment;
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.CheckViolation)
 			{
@@ -211,17 +198,13 @@
 			if (offset < 0)
 				offset = 0;
 
-			using var connection = Database.Connection;
-
-			return connection.Query<GameComment>("SELECT * FROM game_comments WHERE game_id = @id LIMIT @count OFFSET @offset;",
+			return Database.Connection.Query<GameComment>("SELECT * FROM game_comments WHERE game_id = @id LIMIT @count OFFSET @offset;",
 			new { id, offset, count }).ToArray();
 		}
 
 		public static GameComment[] GetComments(int id, int user_id)
 		{
-			using var connection = Database.Connection;
-
-			return connection.Query<GameComment>("SELECT * FROM game_comments WHERE game_id = @id AND user_id = @user_id;",
+			return Database.Connection.Query<GameComment>("SELECT * FROM game_comments WHERE game_id = @id AND user_id = @user_id;",
 			new { id, user_id }).ToArray();
 		}
 	}

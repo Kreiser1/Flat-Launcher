@@ -16,11 +16,9 @@
 		{
 			password = BCrypt.HashPassword(password);
 
-			using var connection = Database.Connection;
-
 			try
 			{
-				return connection.QueryFirst<User>(@"
+				return Database.Connection.QueryFirst<User>(@"
 					INSERT INTO users (login, password_hash, role, nickname)
 					VALUES(@login, @password, @role, @nickname)
 					RETURNING *;
@@ -65,11 +63,9 @@
 			if (clauses.Count == 0)
 				return;
 
-			using var connection = Database.Connection;
-
 			try
 			{
-				int rowsAffected = connection.Execute($"UPDATE users SET {string.Join(", ", clauses)} WHERE id = @id;",
+				int rowsAffected = Database.Connection.Execute($"UPDATE users SET {string.Join(", ", clauses)} WHERE id = @id;",
 				new { id, login, password, role, nickname, banned });
 
 				if (rowsAffected == 0)
@@ -87,11 +83,29 @@
 
 		public static User? Select(int id)
 		{
-			using var connection = Database.Connection;
-
-			return connection.QueryFirstOrDefault<User>(@"
+			return Database.Connection.QueryFirstOrDefault<User>(@"
 				SELECT * FROM users WHERE id = @id;
 				", new { id });
+		}
+
+		public static User? Select(string login)
+		{
+			return Database.Connection.QueryFirstOrDefault<User>(@"
+				SELECT * FROM users WHERE login = @login;
+				", new { login });
+		}
+
+		public static User? Login(string login, string password)
+		{
+			var user = Database.Connection.QueryFirstOrDefault<User>(@"
+				SELECT * FROM users WHERE login = @Login;
+				", new { Login = login });
+
+			if (user is not null && !user.Banned)
+				if (!BCrypt.Verify(password, user.PasswordHash))
+					user = null;
+
+			return user;
 		}
 
 		public static User[] Select(string? nickname = null, string? role = null)
@@ -99,22 +113,21 @@
 			List<string> clauses = new();
 
 			if (nickname is not null)
+				{
+				clauses.Add("login ILIKE @nickname");
 				clauses.Add("nickname ILIKE @nickname");
+			}
 
 			if (role is not null)
 				clauses.Add("role = @role");
 
-			using var connection = Database.Connection;
-
-			return connection.Query<User>($"SELECT * FROM users WHERE {(clauses.Count > 0 ? string.Join(" AND ", clauses) : "TRUE")};",
+			return Database.Connection.Query<User>($"SELECT * FROM users WHERE {(clauses.Count > 0 ? string.Join(" AND ", clauses) : "TRUE")};",
 			new { nickname = $"%{nickname}%", role }).ToArray();
 		}
 
 		public static void Delete(int id)
 		{
-			using var connection = Database.Connection;
-
-			int rowsAffected = connection.Execute(@"
+			int rowsAffected = Database.Connection.Execute(@"
 					DELETE FROM users WHERE id = @id;
 					", new { id });
 

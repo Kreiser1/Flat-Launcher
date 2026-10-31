@@ -1,24 +1,30 @@
 ﻿namespace Flat_Server.Database
 {
+	using System.Security.Cryptography;
+
 	using Dapper;
 
 	using Models;
 
 	using Npgsql;
 
-	using System.Security.Cryptography;
-
 	public static class GameVersions
 	{
-		public static GameVersion Insert(int game_id, string name, byte[] data)
+		public static async Task<GameVersion> InsertAsync(int game_id, string name, byte[] data)
 		{
 			try
 			{
-				return Database.Connection.QueryFirst(@"
-					INSERT INTO game_versions (game_id, name, data, hash)
-					VALUES (@game_id, @name, @data, @hash)
-					RETURNING id, game_id, name, hash, date, approved
-				", new { game_id, name, data, hash = Convert.ToHexStringLower(SHA256.HashData(data)), });
+				return await Database.QueryAsync(connection => connection.QueryFirstAsync<GameVersion>(@"
+                    INSERT INTO game_versions (game_id, name, data, hash)
+                    VALUES (@game_id, @name, @data, @hash)
+                    RETURNING id, game_id, name, hash, date, approved
+                ", new
+				{
+					game_id,
+					name,
+					data,
+					hash = Convert.ToHexStringLower(SHA256.HashData(data)),
+				}));
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
 			{
@@ -34,14 +40,13 @@
 			}
 		}
 
-		public static void Update(int game_id, string name, bool? approved = null, byte[]? data = null)
+		public static async Task UpdateAsync(int game_id, string name, bool? approved = null, byte[]? data = null)
 		{
 			List<string> clauses = new();
+			string hash = string.Empty;
 
 			if (approved is not null)
 				clauses.Add("approved = @approved");
-
-			string hash = string.Empty;
 
 			if (data is not null)
 			{
@@ -56,11 +61,12 @@
 
 			try
 			{
-				int rowsAffected = Database.Connection.Execute($"UPDATE game_versions SET {string.Join(", ", clauses)} WHERE game_id = @game_id AND name = @name;",
-				new { game_id, name, approved, data, hash });
+				int rowsAffected = await Database.QueryAsync(connection => connection.ExecuteAsync(
+					$"UPDATE game_versions SET {string.Join(", ", clauses)} WHERE game_id = @game_id AND name = @name;",
+					new { game_id, name, approved, data, hash }));
 
 				if (rowsAffected == 0)
-					throw new DatabaseException($"Версия игры с ID {game_id} {name} не найден.");
+					throw new DatabaseException($"Такая версия игры не найдена не найдена.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
 			{
@@ -72,34 +78,37 @@
 			}
 		}
 
-		public static GameVersion? Select(int game_id, string name)
+		public static async Task<GameVersion?> SelectAsync(int game_id, string name)
 		{
-			return Database.Connection.QueryFirstOrDefault<GameVersion>(@"
-				SELECT id, game_id, name, hash, approved
-				FROM game_versions WHERE game_id = @game_id AND name = @name;
-				", new { game_id, name });
+			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<GameVersion>(@"
+                SELECT id, game_id, name, hash, approved
+                FROM game_versions
+                WHERE game_id = @game_id AND name = @name;
+                ", new { game_id, name }));
 		}
 
-		public static byte[]? Download(int game_id, string name)
+		public static async Task<byte[]?> DownloadAsync(int game_id, string name)
 		{
-			return Database.Connection.QueryFirstOrDefault<byte[]>(@"
-				SELECT data FROM game_versions WHERE game_id = @game_id AND name = @name;
-				", new { game_id, name });
+			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<byte[]>(@"
+                SELECT data FROM game_versions
+                WHERE game_id = @game_id AND name = @name;
+                ", new { game_id, name }));
 		}
 
-		public static GameVersion[] Select(int game_id)
+		public static async Task<GameVersion[]> SelectAsync(int game_id)
 		{
-			return Database.Connection.Query<GameVersion>(@"
-				SELECT id, game_id, name, hash, approved
-				FROM game_versions WHERE game_id = @game_id;
-				", new { game_id }).ToArray();
+			return (await Database.QueryAsync(connection => connection.QueryAsync<GameVersion>(@"
+                SELECT id, game_id, name, hash, approved
+                FROM game_versions
+                WHERE game_id = @game_id;
+                ", new { game_id }))).ToArray();
 		}
 
-		public static void Delete(int game_id, string name)
+		public static async Task DeleteAsync(int game_id, string name)
 		{
-			int rowsAffected = Database.Connection.Execute(@"
-					DELETE FROM game_versions WHERE game_id = @game_id AND name = @name;
-					", new { game_id, name });
+			int rowsAffected = await Database.QueryAsync(connection => connection.ExecuteAsync(@"
+                DELETE FROM game_versions WHERE game_id = @game_id AND name = @name;
+                ", new { game_id, name }));
 
 			if (rowsAffected == 0)
 				throw new DatabaseException("Версия игры с таким ID не найдена.");

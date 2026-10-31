@@ -8,23 +8,24 @@
 
 	public static class Categories
 	{
-		public static Category Insert(string name)
+		public static async Task<Category> InsertAsync(string name)
 		{
-			return Database.Connection.QueryFirst<Category>(@"
+			return await Database.QueryAsync(connection => connection.QueryFirstAsync(@"
 				INSERT INTO categories (name) VALUES (@name)
 				RETURNING *
-			", new { name });
+			", new { name }));
 		}
 
-		public static void Update(int id, string name)
+		public static async Task UpdateAsync(int id, string name)
 		{
 			try
 			{
-				int rowsAffected = Database.Connection.Execute("UPDATE categories SET name = @name WHERE id = @id;",
-				   new { id, name });
+				int rowsAffected = await Database.QueryAsync(connection =>
+					connection.ExecuteAsync("UPDATE categories SET name = @name WHERE id = @id;",
+					new { id, name }));
 
 				if (rowsAffected == 0)
-					throw new DatabaseException($"Категория с ID {id} не найдена.");
+					throw new DatabaseException("Категория с таким ID не найдена.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
 			{
@@ -36,24 +37,24 @@
 			}
 		}
 
-		public static Category? Select(int id)
+		public static async Task<Category?> SelectAsync(int id)
 		{
-			return Database.Connection.QueryFirstOrDefault<Category>(@"
+			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<Category>(@"
 				SELECT * FROM categories WHERE id = @id;
-				", new { id });
+				", new { id }));
 		}
 
-		public static Category[] Select(string? name = null)
+		public static async Task<IEnumerable<Category>> SelectAsync(string? name = null)
 		{
-			return Database.Connection.Query<Category>($"SELECT * FROM categories WHERE {(name is not null ? $"name ILIKE @name" : "TRUE")};",
-			new { name = $"%{name}%" }).ToArray();
+			return await Database.QueryAsync(connection => connection.QueryAsync<Category>($"SELECT * FROM categories WHERE {(name is not null ? $"name ILIKE @name" : "TRUE")};",
+			new { name = $"%{name}%" }));
 		}
 
-		public static void Delete(int id)
+		public static async Task DeleteAsync(int id)
 		{
-			int rowsAffected = Database.Connection.Execute(@"
+			int rowsAffected = await Database.QueryAsync(connection => connection.ExecuteAsync(@"
 					DELETE FROM categories WHERE id = @id;
-					", new { id });
+					", new { id }));
 
 			if (rowsAffected == 0)
 				throw new DatabaseException("Категория с таким ID не найдена.");

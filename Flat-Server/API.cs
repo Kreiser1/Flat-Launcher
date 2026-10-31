@@ -27,7 +27,7 @@
 				if (user is null)
 					return Results.Unauthorized();
 
-				string token = Auth.GenerateToken(user);
+				string token = Jwt.GenerateToken(user);
 
 				return Results.Ok(new LoginResponse(user.Id, user.Login, user.Nickname ?? user.Login, user.Role, token));
 			});
@@ -37,7 +37,7 @@
 				try
 				{
 					var user = Users.Insert(request.Login, request.Password, Roles.User, request.Nickname);
-					var token = Auth.GenerateToken(user);
+					var token = Jwt.GenerateToken(user);
 					return Results.Ok(new LoginResponse(user.Id, user.Login, user.Nickname ?? user.Login, user.Role, token));
 				}
 				catch (DatabaseException e)

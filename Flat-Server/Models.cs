@@ -1,11 +1,14 @@
-﻿namespace Flat_Server.Database.Models {
-	public static class Roles {
+﻿namespace Flat_Server.Database.Models
+{
+	public static class Roles
+	{
 		public const string Admin = "administrator";
 		public const string Moderator = "moderator";
 		public const string User = "user";
 	}
 
-	public class User {
+	public class User
+	{
 		public required int Id { get; set; }
 		public required string Login { get; set; }
 		public required string PasswordHash { get; set; }
@@ -14,15 +17,18 @@
 		public bool Banned { get; set; } = false;
 	}
 
-	public class Category {
+	public class Category
+	{
 		public required int Id { get; set; }
 		public required string Name { get; set; }
 	}
 
-	public class Game {
+	public class Game
+	{
 		public required int Id { get; set; }
 		public required int UserId { get; set; }
 		public required string Name { get; set; }
+		public required DateTime Date { get; set; } = DateTime.Now;
 		public byte[]? Icon { get; set; }
 		public string? Description { get; set; }
 		public bool Approved { get; set; } = false;
@@ -30,13 +36,15 @@
 		public int Dislikes { get; set; } = 0;
 	}
 
-	public class GameImage {
+	public class GameImage
+	{
 		public required int Id { get; set; }
 		public required int GameId { get; set; }
 		public required byte[] Data { get; set; }
 	}
 
-	public class GameComment {
+	public class GameComment
+	{
 		public required int Id { get; set; }
 		public required int GameId { get; set; }
 		public required int UserId { get; set; }
@@ -44,12 +52,20 @@
 		public required DateTime Date { get; set; } = DateTime.Now;
 	}
 
-	public class GameVersion {
+	public class GameVersion
+	{
 		public required int Id { get; set; }
 		public required int GameId { get; set; }
 		public required string Name { get; set; }
 		public required string Hash { get; set; }
 		public bool Approved { get; set; } = false;
 		public required DateTime Date { get; set; } = DateTime.Now;
+	}
+
+	public class Session
+	{
+		public required int Id { get; set; }
+		public required int UserId { get; set; }
+		public required Guid RefreshToken { get; set; }
 	}
 }

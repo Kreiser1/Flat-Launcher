@@ -4,11 +4,11 @@
 
 	using Microsoft.IdentityModel.Tokens;
 
-	using Database.Models;
+	using Database.Models;z
 	using System.Security.Claims;
 	using System.IdentityModel.Tokens.Jwt;
 
-	public static class Auth
+	public static class Jwt
 	{
 		private static SymmetricSecurityKey _securityKey = null!;
 

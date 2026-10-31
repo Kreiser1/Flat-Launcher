@@ -2,8 +2,6 @@
 {
 	using Models;
 
-	using System.Security.Cryptography;
-
 	using BCrypt.Net;
 
 	using Npgsql;
@@ -12,17 +10,17 @@
 
 	public static class Users
 	{
-		public static User Insert(string login, string password, string role = "user", string? nickname = null)
+		public static async Task<User> InsertAsync(string login, string password, string role = "user", string? nickname = null)
 		{
 			password = BCrypt.HashPassword(password);
 
 			try
 			{
-				return Database.Connection.QueryFirst<User>(@"
+				return await Database.QueryAsync(connection => connection.QueryFirstAsync<User>(@"
 					INSERT INTO users (login, password_hash, role, nickname)
 					VALUES(@login, @password, @role, @nickname)
 					RETURNING *;
-				", new { login, password, role, nickname });
+				", new { login, password, role, nickname }));
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
 			{
@@ -38,7 +36,7 @@
 			}
 		}
 
-		public static void Update(int id, string? login = null, string? password = null, string? role = null, string? nickname = null, bool? banned = null)
+		public static async Task UpdateAsync(int id, string? login = null, string? password = null, string? role = null, string? nickname = null, bool? banned = null)
 		{
 			List<string> clauses = new();
 
@@ -65,11 +63,12 @@
 
 			try
 			{
-				int rowsAffected = Database.Connection.Execute($"UPDATE users SET {string.Join(", ", clauses)} WHERE id = @id;",
-				new { id, login, password, role, nickname, banned });
+				int rowsAffected = await Database.QueryAsync(connection => connection.ExecuteAsync(
+					$"UPDATE users SET {string.Join(", ", clauses)} WHERE id = @id;",
+					new { id, login, password, role, nickname, banned }));
 
 				if (rowsAffected == 0)
-					throw new DatabaseException($"Пользователь с ID {id} не найден.");
+					throw new DatabaseException("Пользователь с таким ID не найден.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
 			{
@@ -81,55 +80,49 @@
 			}
 		}
 
-		public static User? Select(int id)
+		public static async Task<User?> SelectAsync(int id)
 		{
-			return Database.Connection.QueryFirstOrDefault<User>(@"
+			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<User>(@"
 				SELECT * FROM users WHERE id = @id;
-				", new { id });
+				", new { id }));
 		}
 
-		public static User? Select(string login)
+		public static async Task<User?> SelectAsync(string login)
 		{
-			return Database.Connection.QueryFirstOrDefault<User>(@"
+			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<User>(@"
 				SELECT * FROM users WHERE login = @login;
-				", new { login });
+				", new { login }));
 		}
 
-		public static User? Login(string login, string password)
+		public static async Task<User?> LoginAsync(string login, string password)
 		{
-			var user = Database.Connection.QueryFirstOrDefault<User>(@"
+			User? user = await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync<User>(@"
 				SELECT * FROM users WHERE login = @Login;
-				", new { Login = login });
+				", new { Login = login }));
 
-			if (user is not null && !user.Banned)
-				if (!BCrypt.Verify(password, user.PasswordHash))
-					user = null;
-
-			return user;
+			return user is null || user.Banned || !BCrypt.Verify(password, user.PasswordHash) ? null : user;
 		}
 
-		public static User[] Select(string? nickname = null, string? role = null)
+		public static async Task<IEnumerable<User>> SelectAsync(string? nickname = null, string? role = null)
 		{
 			List<string> clauses = new();
 
 			if (nickname is not null)
-				{
-				clauses.Add("login ILIKE @nickname");
-				clauses.Add("nickname ILIKE @nickname");
-			}
+				clauses.Add("(login ILIKE @nickname OR nickname ILIKE @nickname)");
 
 			if (role is not null)
 				clauses.Add("role = @role");
 
-			return Database.Connection.Query<User>($"SELECT * FROM users WHERE {(clauses.Count > 0 ? string.Join(" AND ", clauses) : "TRUE")};",
-			new { nickname = $"%{nickname}%", role }).ToArray();
+			return await Database.QueryAsync(connection => connection.QueryAsync<User>(
+				$"SELECT * FROM users WHERE {(clauses.Count > 0 ? string.Join(" AND ", clauses) : "TRUE")};",
+				new { nickname = $"%{nickname}%", role }));
 		}
 
-		public static void Delete(int id)
+		public static async Task DeleteAsync(int id)
 		{
-			int rowsAffected = Database.Connection.Execute(@"
+			int rowsAffected = await Database.QueryAsync(connection => connection.ExecuteAsync(@"
 					DELETE FROM users WHERE id = @id;
-					", new { id });
+					", new { id }));
 
 			if (rowsAffected == 0)
 				throw new DatabaseException("Пользователь с таким ID не найден.");

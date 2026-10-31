@@ -65,7 +65,7 @@
 					$"UPDATE game_versions SET {string.Join(", ", clauses)} WHERE game_id = @game_id AND name = @name;",
 					new { game_id, name, approved, data, hash }));
 
-				if (rowsAffected == 0)
+				if (rowsAffected <= 0)
 					throw new DatabaseException($"Такая версия игры не найдена не найдена.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
@@ -110,7 +110,7 @@
                 DELETE FROM game_versions WHERE game_id = @game_id AND name = @name;
                 ", new { game_id, name }));
 
-			if (rowsAffected == 0)
+			if (rowsAffected <= 0)
 				throw new DatabaseException("Версия игры с таким ID не найдена.");
 		}
 	}

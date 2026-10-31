@@ -24,7 +24,7 @@
 					connection.ExecuteAsync("UPDATE categories SET name = @name WHERE id = @id;",
 					new { id, name }));
 
-				if (rowsAffected == 0)
+				if (rowsAffected <= 0)
 					throw new DatabaseException("Категория с таким ID не найдена.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
@@ -56,7 +56,7 @@
 					DELETE FROM categories WHERE id = @id;
 					", new { id }));
 
-			if (rowsAffected == 0)
+			if (rowsAffected <= 0)
 				throw new DatabaseException("Категория с таким ID не найдена.");
 		}
 	}

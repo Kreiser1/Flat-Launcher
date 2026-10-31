@@ -67,7 +67,7 @@
 					$"UPDATE users SET {string.Join(", ", clauses)} WHERE id = @id;",
 					new { id, login, password, role, nickname, banned }));
 
-				if (rowsAffected == 0)
+				if (rowsAffected <= 0)
 					throw new DatabaseException("Пользователь с таким ID не найден.");
 			}
 			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
@@ -124,7 +124,7 @@
 					DELETE FROM users WHERE id = @id;
 					", new { id }));
 
-			if (rowsAffected == 0)
+			if (rowsAffected <= 0)
 				throw new DatabaseException("Пользователь с таким ID не найден.");
 		}
 	}

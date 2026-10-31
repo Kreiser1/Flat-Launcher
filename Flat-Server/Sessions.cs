@@ -23,15 +23,6 @@
 			}
 		}
 
-		/*
-CREATE TABLE IF NOT EXISTS sessions (
-	refresh_token UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	user_id INT NOT NULL,
-	info VARCHAR(128),
-	CONSTRAINT FK_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-);
- */
-
 		public static async Task<Session?> SelectAsync(Guid refreshToken)
 		{
 			return await Database.QueryAsync(connection => connection.QueryFirstOrDefaultAsync(@"
@@ -52,7 +43,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 				DELETE FROM sessions WHERE refresh_token = @refresh_token;
 				", new { refresh_token = refreshToken }));
 
-			if (rowsAffected == 0)
+			if (rowsAffected <= 0)
 				throw new DatabaseException("Категория с таким ID не найдена.");
 		}
 	}

@@ -4,7 +4,7 @@
 
 	using Microsoft.IdentityModel.Tokens;
 
-	using Database.Models;z
+	using Database.Models;
 	using System.Security.Claims;
 	using System.IdentityModel.Tokens.Jwt;
 

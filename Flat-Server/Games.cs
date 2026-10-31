@@ -200,7 +200,7 @@
                 DELETE FROM games WHERE id = @id;
                 ", new { id }));
 
-			if (rowsAffected == 0)
+			if (rowsAffected <= 0)
 				throw new DatabaseException("Игра с таким ID не найдена.");
 		}
 
@@ -245,6 +245,36 @@
 			return await Database.QueryAsync(connection => connection.QueryAsync<GameComment>(
 				"SELECT * FROM game_comments WHERE game_id = @id AND user_id = @user_id;",
 				new { id, user_id }));
+		}
+
+		public static async Task<(int Likes, int Dislikes)> GetRatingAsync(int id)
+		{
+			return await Database.QueryAsync(connection => connection.QueryFirstAsync<(int, int)>(
+				@"SELECT 
+				COUNT(CASE WHEN value > 0 THEN 1 END),
+				COUNT(CASE WHEN value < 0 THEN 1 END)
+				FROM game_ratings 
+				WHERE game_id = @id;",
+				new { id }));
+		}
+
+		public static async Task InsertRatingAsync(int id, int user_id, int value)
+		{
+			try
+			{
+				await Database.QueryAsync(connection => connection.ExecuteAsync(@"
+                    INSERT INTO game_ratings (game_id, user_id, value)
+                    VALUES (@id, @user_id, @value);
+                ", new { id, user_id, value }));
+			}
+			catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation)
+			{
+				throw new DatabaseException("Игра уже оценена.");
+			}
+			catch (PostgresException)
+			{
+				throw new DatabaseException("Не удалось добавить оценку.");
+			}
 		}
 	}
 }

@@ -42,7 +42,7 @@ internal class Program {
 		var app = builder.Build();
 
 		Database.Connect(app.Configuration.GetConnectionString("Default") ?? "");
-		Jwt.Initialize(secret);
+		LogonManager.Initialize(secret);
 
 		API.Initialize(app);
 

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Client/Client.csproj" />
+  <Project Path="Core/Core.csproj" />
+  <Project Path="Database/Database.csproj" />
+  <Project Path="Schema/Schema.csproj" />
+  <Project Path="WebAPI/WebAPI.csproj" />
+</Solution>
